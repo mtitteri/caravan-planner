@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2980b9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CaravanPlanner">
+<title>Cessna Caravan C208B Flight Planner</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+  h1 { font-size: 22px; font-weight: 500; margin-bottom: 1.5rem; color: #222; }
+  .controls { display: flex; align-items: center; gap: 16px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  label { font-size: 14px; color: #555; white-space: nowrap; }
+  select { font-size: 14px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
+  button { font-size: 14px; padding: 8px 20px; border: 1px solid #aaa; border-radius: 6px; background: #fff; cursor: pointer; }
+  button:hover { background: #eee; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 1rem; }
+  .route-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-bottom: 1rem; }
+  .airport-box { text-align: center; }
+  .icao { font-size: 32px; font-weight: 500; color: #111; letter-spacing: 2px; }
+  .airport-name { font-size: 12px; color: #888; margin-top: 4px; }
+  .runway-info { font-size: 13px; color: #888; margin-top: 8px; }
+  .runway-val { font-weight: 500; color: #222; }
+  .arrow { text-align: center; font-size: 24px; color: #888; }
+  .dist-badge { text-align: center; background: #f5f5f5; border-radius: 8px; padding: 12px; margin-bottom: 1rem; }
+  .dist-num { font-size: 28px; font-weight: 500; color: #111; }
+  .dist-label { font-size: 12px; color: #888; }
+  .map-container { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+  .empty-state { text-align: center; padding: 2rem; color: #888; font-size: 14px; }
+  .warn { font-size: 12px; color: #c0392b; margin-top: 8px; }
+  .wx-title { font-size: 15px; font-weight: 500; color: #222; margin-bottom: 14px; border-bottom: 1px solid #eee; padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .wx-station { font-size: 12px; color: #aaa; font-weight: 400; }
+  .wx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .wx-stat { background: #f8f8f8; border-radius: 8px; padding: 12px; text-align: center; }
+  .wx-stat-label { font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .wx-stat-value { font-size: 22px; font-weight: 500; color: #111; }
+  .wx-stat-unit { font-size: 11px; color: #888; margin-top: 2px; }
+  .wx-sky { font-size: 13px; color: #555; margin-top: 8px; }
+  .wx-raw { font-size: 11px; color: #aaa; margin-top: 10px; font-family: monospace; word-break: break-all; }
+  .wx-loading { font-size: 13px; color: #888; padding: 12px 0; }
+  .wx-error { font-size: 13px; color: #c0392b; padding: 8px 0; }
+  .wx-vfr { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 8px; }
+  .vfr  { background: #d5f5e3; color: #1e8449; }
+  .mvfr { background: #d6eaf8; color: #1a5276; }
+  .ifr  { background: #fadbd8; color: #922b21; }
+  .lifr { background: #f4d6f5; color: #6c3483; }
+  .fuel-title { font-size: 15px; font-weight: 500; color: #222; margin-bottom: 14px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  .fuel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .fuel-stat { background: #f8f8f8; border-radius: 8px; padding: 12px; text-align: center; }
+  .fuel-stat-label { font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .fuel-stat-value { font-size: 22px; font-weight: 500; color: #111; }
+  .fuel-stat-unit { font-size: 11px; color: #888; margin-top: 2px; }
+  .fuel-margin-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .fuel-margin-row label { font-size: 14px; color: #555; }
+  .margin-btn { font-size: 13px; padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px; background: #fff; cursor: pointer; }
+  .margin-btn:hover { background: #eee; }
+  .margin-btn.active { background: #2980b9; color: #fff; border-color: #2980b9; }
+  .fuel-total-row { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #eee; }
+  .fuel-total-label { font-size: 14px; color: #555; }
+  .fuel-total-value { font-size: 28px; font-weight: 500; color: #2980b9; }
+  .fuel-total-unit { font-size: 14px; color: #888; }
+  .fuel-note { font-size: 11px; color: #aaa; margin-top: 8px; }
+  #installBanner { display: none; background: #2980b9; color: #fff; padding: 12px 20px; border-radius: 8px; margin-bottom: 1rem; font-size: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  #installBanner button { background: #fff; color: #2980b9; border: none; padding: 6px 16px; border-radius: 6px; font-weight: 500; cursor: pointer; }
+  #installBanner .dismiss { background: transparent; color: rgba(255,255,255,0.7); border: none; font-size: 18px; cursor: pointer; padding: 0 4px; }
+</style>
+</head>
+<body>
+
+<div id="installBanner">
+  <span>Install Caravan Planner as an app on this device</span>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button onclick="installApp()">Install</button>
+    <button class="dismiss" onclick="dismissBanner()">&#x2715;</button>
+  </div>
+</div>
+
+<h1>Cessna Caravan C208B — Random Flight Planner</h1>
+
+<div class="controls">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <label>Min distance:</label>
+    <select id="minDist">
+      <option value="10">10 nm</option>
+      <option value="25">25 nm</option>
+      <option value="50" selected>50 nm</option>
+      <option value="100">100 nm</option>
+      <option value="150">150 nm</option>
+      <option value="200">200 nm</option>
+    </select>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <label>Max distance:</label>
+    <select id="maxDist">
+      <option value="50">50 nm</option>
+      <option value="100">100 nm</option>
+      <option value="150">150 nm</option>
+      <option value="200" selected>200 nm</option>
+      <option value="300">300 nm</option>
+      <option value="400">400 nm</option>
+      <option value="500">500 nm</option>
+      <option value="600">600 nm</option>
+      <option value="700">700 nm</option>
+      <option value="800">800 nm</option>
+      <option value="900">900 nm (max range)</option>
+    </select>
+  </div>
+  <button onclick="generateFlight()">Generate flight</button>
+</div>
+
+<div id="warnMsg" class="warn" style="display:none;"></div>
+
+<div id="empty" class="card empty-state">
+  Select a distance range and click <strong>Generate flight</strong> to get a random Caravan route.
+</div>
+
+<div id="result" style="display:none;">
+
+  <div class="card">
+    <div class="route-grid">
+      <div class="airport-box">
+        <div class="icao" id="depCode">—</div>
+        <div class="airport-name" id="depName"></div>
+        <div class="runway-info">Runway: <span class="runway-val" id="depRwy">—</span></div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="airport-box">
+        <div class="icao" id="arrCode">—</div>
+        <div class="airport-name" id="arrName"></div>
+        <div class="runway-info">Runway: <span class="runway-val" id="arrRwy">—</span></div>
+      </div>
+    </div>
+    <div class="dist-badge">
+      <div class="dist-num" id="distNum">—</div>
+      <div class="dist-label">nautical miles</div>
+    </div>
+    <div class="map-container">
+      <div id="map" style="height:320px;"></div>
+    </div>
+  </div>
+
+  <div class="card" id="wxCard">
+    <div class="wx-title">
+      <span>Departure Weather <span id="wxFlightCat"></span></span>
+      <span class="wx-station" id="wxStation"></span>
+    </div>
+    <div id="wxBody">
+      <div class="wx-loading" id="wxLoading">Fetching weather data...</div>
+      <div id="wxContent" style="display:none;">
+        <div class="wx-grid">
+          <div class="wx-stat">
+            <div class="wx-stat-label">Temperature</div>
+            <div class="wx-stat-value" id="wxTemp">—</div>
+            <div class="wx-stat-unit" id="wxTempUnit"></div>
+          </div>
+          <div class="wx-stat">
+            <div class="wx-stat-label">Wind</div>
+            <div class="wx-stat-value" id="wxWindSpd">—</div>
+            <div class="wx-stat-unit" id="wxWindDir">—</div>
+          </div>
+          <div class="wx-stat">
+            <div class="wx-stat-label">Visibility</div>
+            <div class="wx-stat-value" id="wxVis">—</div>
+            <div class="wx-stat-unit">statute miles</div>
+          </div>
+          <div class="wx-stat">
+            <div class="wx-stat-label">Altimeter</div>
+            <div class="wx-stat-value" id="wxAlt">—</div>
+            <div class="wx-stat-unit">inHg</div>
+          </div>
+        </div>
+        <div class="wx-sky" id="wxSky"></div>
+        <div class="wx-raw" id="wxRaw"></div>
+      </div>
+      <div class="wx-error" id="wxError" style="display:none;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="fuel-title">Fuel Planning — C208B Caravan</div>
+    <div class="fuel-grid">
+      <div class="fuel-stat">
+        <div class="fuel-stat-label">Flight time (est.)</div>
+        <div class="fuel-stat-value" id="fuelTime">—</div>
+        <div class="fuel-stat-unit">hrs : min</div>
+      </div>
+      <div class="fuel-stat">
+        <div class="fuel-stat-label">Burn rate</div>
+        <div class="fuel-stat-value">300</div>
+        <div class="fuel-stat-unit">lbs / hr</div>
+      </div>
+      <div class="fuel-stat">
+        <div class="fuel-stat-label">Base fuel required</div>
+        <div class="fuel-stat-value" id="fuelBase">—</div>
+        <div class="fuel-stat-unit">lbs</div>
+      </div>
+    </div>
+    <div class="fuel-margin-row">
+      <label>Add margin:</label>
+      <button class="margin-btn active" id="btn5" onclick="setMargin(5)">+5%</button>
+      <button class="margin-btn" id="btn10" onclick="setMargin(10)">+10%</button>
+      <button class="margin-btn" id="btn15" onclick="setMargin(15)">+15%</button>
+    </div>
+    <div class="fuel-total-row">
+      <span class="fuel-total-label">Total fuel with margin:</span>
+      <span class="fuel-total-value" id="fuelTotal">—</span>
+      <span class="fuel-total-unit">lbs</span>
+    </div>
+    <div class="fuel-note">
+      Based on avg cruise speed 175 kts, burn rate 300 lbs/hr at 75% power cruise (PT6A-114A).
+      Max usable fuel: 3,300 lbs. Figures are estimates for planning purposes only.
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW not available:', err));
+  });
+}
+
+// ---- PWA Install ----
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').style.display = 'flex';
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBanner').style.display = 'none';
+  deferredPrompt = null;
+});
+
+function installApp() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById('installBanner').style.display = 'none';
+  });
+}
+
+function dismissBanner() {
+  document.getElementById('installBanner').style.display = 'none';
+}
+
+// ---- Service Worker ----
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// ---- App Data ----
+const AIRPORTS = [
+  {icao:"KJFK",name:"New York JFK",lat:40.6413,lon:-73.7781,rwy:14572},
+  {icao:"KLAX",name:"Los Angeles Intl",lat:33.9425,lon:-118.4081,rwy:12923},
+  {icao:"KORD",name:"Chicago O'Hare",lat:41.9742,lon:-87.9073,rwy:12592},
+  {icao:"KDFW",name:"Dallas Fort Worth",lat:32.8975,lon:-97.038,rwy:13401},
+  {icao:"KDEN",name:"Denver Intl",lat:39.8561,lon:-104.6737,rwy:16000},
+  {icao:"KSFO",name:"San Francisco Intl",lat:37.6213,lon:-122.379,rwy:11065},
+  {icao:"KATL",name:"Atlanta Hartsfield",lat:33.6367,lon:-84.4277,rwy:12325},
+  {icao:"KMIA",name:"Miami Intl",lat:25.7959,lon:-80.287,rwy:13000},
+  {icao:"KBOS",name:"Boston Logan",lat:42.3656,lon:-71.0096,rwy:10083},
+  {icao:"KSEA",name:"Seattle Tacoma",lat:47.4502,lon:-122.3088,rwy:11901},
+  {icao:"KLAS",name:"Las Vegas Harry Reid",lat:36.0840,lon:-115.1537,rwy:14512},
+  {icao:"KPHX",name:"Phoenix Sky Harbor",lat:33.4373,lon:-112.0078,rwy:11489},
+  {icao:"KMSP",name:"Minneapolis St. Paul",lat:44.8848,lon:-93.2223,rwy:12003},
+  {icao:"KDTW",name:"Detroit Metro",lat:42.2162,lon:-83.3554,rwy:12003},
+  {icao:"KBWI",name:"Baltimore Washington",lat:39.1754,lon:-76.6682,rwy:10502},
+  {icao:"KIAD",name:"Washington Dulles",lat:38.9531,lon:-77.4565,rwy:11501},
+  {icao:"KPHL",name:"Philadelphia Intl",lat:39.8719,lon:-75.2411,rwy:12000},
+  {icao:"KSLC",name:"Salt Lake City",lat:40.7884,lon:-111.9778,rwy:12002},
+  {icao:"KPDX",name:"Portland Oregon",lat:45.5898,lon:-122.5951,rwy:11004},
+  {icao:"KSTL",name:"St. Louis Lambert",lat:38.7487,lon:-90.3700,rwy:11019},
+  {icao:"KMCO",name:"Orlando Intl",lat:28.4294,lon:-81.3089,rwy:12005},
+  {icao:"KTPA",name:"Tampa Intl",lat:27.9755,lon:-82.5332,rwy:11002},
+  {icao:"KAUS",name:"Austin Bergstrom",lat:30.1975,lon:-97.6664,rwy:12250},
+  {icao:"KHOU",name:"Houston Hobby",lat:29.6454,lon:-95.2789,rwy:7602},
+  {icao:"KIAH",name:"Houston Intercontinental",lat:29.9902,lon:-95.3368,rwy:12001},
+  {icao:"KCLE",name:"Cleveland Hopkins",lat:41.4117,lon:-81.8498,rwy:10000},
+  {icao:"KPIT",name:"Pittsburgh Intl",lat:40.4915,lon:-80.2329,rwy:11500},
+  {icao:"KRDU",name:"Raleigh Durham",lat:35.8776,lon:-78.7875,rwy:10000},
+  {icao:"KCLT",name:"Charlotte Douglas",lat:35.2140,lon:-80.9431,rwy:10000},
+  {icao:"KMEM",name:"Memphis Intl",lat:35.0421,lon:-89.9767,rwy:11120},
+  {icao:"KBNA",name:"Nashville Intl",lat:36.1245,lon:-86.6782,rwy:11030},
+  {icao:"KIND",name:"Indianapolis Intl",lat:39.7173,lon:-86.2944,rwy:11200},
+  {icao:"KCVG",name:"Cincinnati Intl",lat:39.0488,lon:-84.6678,rwy:11002},
+  {icao:"KMKE",name:"Milwaukee Mitchell",lat:42.9472,lon:-87.8966,rwy:9690},
+  {icao:"KOMA",name:"Omaha Eppley",lat:41.3032,lon:-95.8941,rwy:9500},
+  {icao:"KABQ",name:"Albuquerque Intl",lat:35.0402,lon:-106.6091,rwy:13793},
+  {icao:"KTUS",name:"Tucson Intl",lat:32.1161,lon:-110.9410,rwy:10996},
+  {icao:"KBUR",name:"Burbank",lat:34.2007,lon:-118.3585,rwy:6886},
+  {icao:"KSAN",name:"San Diego Intl",lat:32.7338,lon:-117.1933,rwy:9401},
+  {icao:"KOAK",name:"Oakland Intl",lat:37.7213,lon:-122.2208,rwy:10000},
+  {icao:"KSAC",name:"Sacramento Intl",lat:38.6954,lon:-121.5908,rwy:8600},
+  {icao:"KFAT",name:"Fresno Yosemite",lat:36.7762,lon:-119.7182,rwy:9222},
+  {icao:"KRNO",name:"Reno Tahoe",lat:39.4991,lon:-119.7681,rwy:11003},
+  {icao:"KBOI",name:"Boise Air Terminal",lat:43.5644,lon:-116.2228,rwy:10000},
+  {icao:"KBZN",name:"Bozeman Yellowstone",lat:45.7775,lon:-111.1603,rwy:9003},
+  {icao:"KBIL",name:"Billings Logan",lat:45.8077,lon:-108.5428,rwy:10527},
+  {icao:"KFSD",name:"Sioux Falls",lat:43.5820,lon:-96.7419,rwy:9001},
+  {icao:"KFAR",name:"Fargo Hector",lat:46.9207,lon:-96.8158,rwy:9000},
+  {icao:"KBIS",name:"Bismarck",lat:46.7727,lon:-100.7457,rwy:8800},
+  {icao:"KRAP",name:"Rapid City",lat:44.0453,lon:-103.0574,rwy:8701},
+  {icao:"KCOD",name:"Cody Yellowstone",lat:44.5202,lon:-109.0238,rwy:8000},
+  {icao:"KJAC",name:"Jackson Hole",lat:43.6073,lon:-110.7378,rwy:6300},
+  {icao:"KASE",name:"Aspen Pitkin",lat:39.2233,lon:-106.8688,rwy:7006},
+  {icao:"KEGE",name:"Eagle Vail",lat:39.6426,lon:-106.9177,rwy:9000},
+  {icao:"KGUC",name:"Gunnison",lat:38.5339,lon:-106.9330,rwy:9401},
+  {icao:"KTWF",name:"Twin Falls",lat:42.4818,lon:-114.4878,rwy:8700},
+  {icao:"KPSC",name:"Tri-Cities WA",lat:46.2647,lon:-119.1190,rwy:7717},
+  {icao:"KGEG",name:"Spokane Intl",lat:47.6199,lon:-117.5339,rwy:11002},
+  {icao:"KBTM",name:"Butte",lat:45.9548,lon:-112.4974,rwy:9000},
+  {icao:"KMSO",name:"Missoula",lat:46.9163,lon:-114.0906,rwy:9501},
+  {icao:"KGTF",name:"Great Falls",lat:47.4820,lon:-111.3709,rwy:10502},
+  {icao:"KHLN",name:"Helena",lat:46.6068,lon:-111.9833,rwy:9000},
+  {icao:"KHNL",name:"Honolulu Intl",lat:21.3241,lon:-157.9251,rwy:12000},
+  {icao:"PHOG",name:"Maui Kahului",lat:20.8986,lon:-156.4305,rwy:7000},
+  {icao:"PHKO",name:"Kona Intl",lat:19.7388,lon:-156.0456,rwy:8100},
+  {icao:"PHTO",name:"Hilo Intl",lat:19.7214,lon:-155.0485,rwy:9800},
+  {icao:"PAAQ",name:"Palmer AK",lat:61.5949,lon:-149.0890,rwy:6000},
+  {icao:"PANC",name:"Anchorage Intl",lat:61.1744,lon:-149.9964,rwy:12400},
+  {icao:"PAFA",name:"Fairbanks Intl",lat:64.8151,lon:-147.8561,rwy:11800},
+  {icao:"PAJN",name:"Juneau Intl",lat:58.3550,lon:-134.5763,rwy:8456},
+  {icao:"PAKT",name:"Ketchikan Intl",lat:55.3556,lon:-131.7137,rwy:7500},
+  {icao:"PASN",name:"St Paul Island AK",lat:57.1673,lon:-170.2203,rwy:8810},
+  {icao:"PAOM",name:"Nome AK",lat:64.5122,lon:-165.4453,rwy:6001},
+  {icao:"EGLL",name:"London Heathrow",lat:51.4700,lon:-0.4543,rwy:14100},
+  {icao:"EGKK",name:"London Gatwick",lat:51.1481,lon:-0.1903,rwy:10879},
+  {icao:"EGGW",name:"London Luton",lat:51.8747,lon:-0.3683,rwy:7087},
+  {icao:"EGSS",name:"London Stansted",lat:51.8850,lon:0.2350,rwy:10003},
+  {icao:"EGCC",name:"Manchester",lat:53.3537,lon:-2.2750,rwy:10000},
+  {icao:"EGPH",name:"Edinburgh",lat:55.9500,lon:-3.3725,rwy:8400},
+  {icao:"EGPF",name:"Glasgow",lat:55.8719,lon:-4.4331,rwy:8750},
+  {icao:"EIDW",name:"Dublin",lat:53.4213,lon:-6.2701,rwy:10499},
+  {icao:"EINN",name:"Shannon",lat:52.7020,lon:-8.9248,rwy:10499},
+  {icao:"LFPG",name:"Paris CDG",lat:49.0097,lon:2.5479,rwy:13829},
+  {icao:"LFPO",name:"Paris Orly",lat:48.7233,lon:2.3794,rwy:11975},
+  {icao:"LFML",name:"Marseille",lat:43.4393,lon:5.2214,rwy:11483},
+  {icao:"LFMN",name:"Nice Cote d'Azur",lat:43.6584,lon:7.2159,rwy:9711},
+  {icao:"LFBO",name:"Toulouse Blagnac",lat:43.6293,lon:1.3638,rwy:11483},
+  {icao:"EDDF",name:"Frankfurt Intl",lat:50.0379,lon:8.5622,rwy:13123},
+  {icao:"EDDM",name:"Munich",lat:48.3538,lon:11.7861,rwy:13123},
+  {icao:"EDDB",name:"Berlin Brandenburg",lat:52.3667,lon:13.5033,rwy:13123},
+  {icao:"EDDH",name:"Hamburg",lat:53.6304,lon:9.9882,rwy:12008},
+  {icao:"EDDL",name:"Dusseldorf",lat:51.2895,lon:6.7668,rwy:9839},
+  {icao:"EDDK",name:"Cologne Bonn",lat:50.8659,lon:7.1427,rwy:12467},
+  {icao:"EHAM",name:"Amsterdam Schiphol",lat:52.3086,lon:4.7639,rwy:12467},
+  {icao:"EHRD",name:"Rotterdam",lat:51.9569,lon:4.4372,rwy:7218},
+  {icao:"EBCI",name:"Charleroi Brussels South",lat:50.4592,lon:4.4538,rwy:8202},
+  {icao:"EBBR",name:"Brussels Intl",lat:50.9014,lon:4.4844,rwy:11936},
+  {icao:"LEMD",name:"Madrid Barajas",lat:40.4719,lon:-3.5626,rwy:13451},
+  {icao:"LEBL",name:"Barcelona El Prat",lat:41.2971,lon:2.0785,rwy:11808},
+  {icao:"LEZL",name:"Seville",lat:37.4180,lon:-5.8931,rwy:10499},
+  {icao:"LEMG",name:"Malaga",lat:36.6750,lon:-4.4994,rwy:10499},
+  {icao:"LEPA",name:"Palma Mallorca",lat:39.5517,lon:2.7388,rwy:11483},
+  {icao:"LIRF",name:"Rome Fiumicino",lat:41.8003,lon:12.2388,rwy:12795},
+  {icao:"LIMC",name:"Milan Malpensa",lat:45.6306,lon:8.7281,rwy:12861},
+  {icao:"LIME",name:"Bergamo",lat:45.6739,lon:9.7042,rwy:9842},
+  {icao:"LIPZ",name:"Venice Marco Polo",lat:45.5053,lon:12.3519,rwy:10827},
+  {icao:"LIRN",name:"Naples",lat:40.8860,lon:14.2908,rwy:8694},
+  {icao:"LMML",name:"Malta Intl",lat:35.8574,lon:14.4775,rwy:11627},
+  {icao:"LGAV",name:"Athens Intl",lat:37.9364,lon:23.9445,rwy:13123},
+  {icao:"LGTS",name:"Thessaloniki",lat:40.5197,lon:22.9709,rwy:8005},
+  {icao:"LCLK",name:"Larnaca Cyprus",lat:34.8751,lon:33.6249,rwy:11483},
+  {icao:"LCPH",name:"Paphos Cyprus",lat:34.7180,lon:32.4857,rwy:9843},
+  {icao:"LOWW",name:"Vienna",lat:48.1103,lon:16.5697,rwy:11811},
+  {icao:"LZKZ",name:"Kosice Slovakia",lat:48.6631,lon:21.2411,rwy:8202},
+  {icao:"LZIB",name:"Bratislava",lat:48.1702,lon:17.2127,rwy:9843},
+  {icao:"LKPR",name:"Prague",lat:50.1008,lon:14.2600,rwy:12188},
+  {icao:"EPWA",name:"Warsaw Chopin",lat:52.1657,lon:20.9671,rwy:12064},
+  {icao:"EPKK",name:"Krakow",lat:50.0777,lon:19.7848,rwy:9186},
+  {icao:"OKBK",name:"Kuwait Intl",lat:29.2267,lon:47.9689,rwy:15091},
+  {icao:"OEDF",name:"Dammam",lat:26.4712,lon:49.7979,rwy:13123},
+  {icao:"OERK",name:"Riyadh",lat:24.9576,lon:46.6988,rwy:13123},
+  {icao:"OEJN",name:"Jeddah",lat:21.6796,lon:39.1565,rwy:13123},
+  {icao:"OMDB",name:"Dubai Intl",lat:25.2528,lon:55.3644,rwy:13123},
+  {icao:"OMDW",name:"Dubai World Central",lat:24.8966,lon:55.1614,rwy:14764},
+  {icao:"OMAA",name:"Abu Dhabi",lat:24.4330,lon:54.6511,rwy:13451},
+  {icao:"OOMS",name:"Muscat",lat:23.5933,lon:58.2844,rwy:13123},
+  {icao:"OBBI",name:"Bahrain",lat:26.2708,lon:50.6336,rwy:13123},
+  {icao:"OTHH",name:"Doha Hamad",lat:25.2731,lon:51.6081,rwy:15748},
+  {icao:"RJTT",name:"Tokyo Haneda",lat:35.5494,lon:139.7798,rwy:10991},
+  {icao:"RJAA",name:"Tokyo Narita",lat:35.7720,lon:140.3929,rwy:13123},
+  {icao:"RJOO",name:"Osaka Itami",lat:34.7855,lon:135.4386,rwy:9843},
+  {icao:"RJBB",name:"Osaka Kansai",lat:34.4347,lon:135.2440,rwy:13123},
+  {icao:"RJFF",name:"Fukuoka",lat:33.5857,lon:130.4511,rwy:9186},
+  {icao:"RJCC",name:"Sapporo New Chitose",lat:42.7752,lon:141.6922,rwy:9843},
+  {icao:"RJCK",name:"Kushiro",lat:43.0410,lon:144.1928,rwy:8202},
+  {icao:"ROAH",name:"Okinawa Naha",lat:26.1958,lon:127.6461,rwy:9843},
+  {icao:"RKSS",name:"Seoul Gimpo",lat:37.5583,lon:126.7906,rwy:12008},
+  {icao:"RKSI",name:"Seoul Incheon",lat:37.4602,lon:126.4407,rwy:13451},
+  {icao:"RKPU",name:"Ulsan",lat:35.5935,lon:129.3520,rwy:6562},
+  {icao:"RKPK",name:"Busan Gimhae",lat:35.1795,lon:128.9382,rwy:9843},
+  {icao:"VHHH",name:"Hong Kong Intl",lat:22.3088,lon:113.9185,rwy:12467},
+  {icao:"VMMC",name:"Macau",lat:22.1496,lon:113.5916,rwy:9843},
+  {icao:"ZGGG",name:"Guangzhou Baiyun",lat:23.3924,lon:113.2990,rwy:12467},
+  {icao:"ZSSS",name:"Shanghai Hongqiao",lat:31.1979,lon:121.3363,rwy:10827},
+  {icao:"ZSPD",name:"Shanghai Pudong",lat:31.1434,lon:121.8052,rwy:13123},
+  {icao:"ZBAA",name:"Beijing Capital",lat:40.0801,lon:116.5850,rwy:12467},
+  {icao:"ZUCK",name:"Chongqing",lat:29.7192,lon:106.6419,rwy:11483},
+  {icao:"ZUUU",name:"Chengdu",lat:30.5785,lon:103.9469,rwy:12467},
+  {icao:"ZGSZ",name:"Shenzhen",lat:22.6393,lon:113.8107,rwy:11483},
+  {icao:"WSSS",name:"Singapore Changi",lat:1.3592,lon:103.9894,rwy:13123},
+  {icao:"WMKK",name:"Kuala Lumpur",lat:2.7456,lon:101.7100,rwy:13451},
+  {icao:"WMKB",name:"Butterworth Malaysia",lat:5.4659,lon:100.4009,rwy:9000},
+  {icao:"VTBS",name:"Bangkok Suvarnabhumi",lat:13.6811,lon:100.7475,rwy:13123},
+  {icao:"VTBD",name:"Bangkok Don Mueang",lat:13.9126,lon:100.6067,rwy:11483},
+  {icao:"VTCC",name:"Chiang Mai",lat:18.7668,lon:98.9626,rwy:9843},
+  {icao:"VVTS",name:"Ho Chi Minh City",lat:10.8188,lon:106.6520,rwy:12008},
+  {icao:"VVNB",name:"Hanoi Noi Bai",lat:21.2212,lon:105.8072,rwy:12139},
+  {icao:"VDPP",name:"Phnom Penh",lat:11.5466,lon:104.8441,rwy:9843},
+  {icao:"VLVT",name:"Vientiane",lat:17.9883,lon:102.5633,rwy:9843},
+  {icao:"VYYY",name:"Yangon",lat:16.9073,lon:96.1332,rwy:11000},
+  {icao:"WIII",name:"Jakarta Soekarno-Hatta",lat:-6.1256,lon:106.6559,rwy:12139},
+  {icao:"WADD",name:"Bali Denpasar",lat:-8.7482,lon:115.1671,rwy:9843},
+  {icao:"WBGG",name:"Kuching Malaysia",lat:1.4847,lon:110.3469,rwy:8858},
+  {icao:"RPLL",name:"Manila Ninoy Aquino",lat:14.5086,lon:121.0197,rwy:12960},
+  {icao:"RPVM",name:"Cebu Mactan",lat:10.3075,lon:123.9795,rwy:11483},
+  {icao:"VAAH",name:"Ahmedabad",lat:23.0772,lon:72.6347,rwy:12008},
+  {icao:"VABB",name:"Mumbai",lat:19.0896,lon:72.8656,rwy:11450},
+  {icao:"VIDP",name:"Delhi",lat:28.5665,lon:77.1031,rwy:14534},
+  {icao:"VOMM",name:"Chennai",lat:12.9900,lon:80.1693,rwy:10066},
+  {icao:"VOBL",name:"Bangalore",lat:13.1979,lon:77.7063,rwy:13123},
+  {icao:"VECC",name:"Kolkata",lat:22.6527,lon:88.4467,rwy:11900},
+  {icao:"VOHY",name:"Hyderabad",lat:17.2313,lon:78.4298,rwy:13123},
+  {icao:"VOCI",name:"Kochi",lat:10.1520,lon:76.3919,rwy:9843},
+  {icao:"VOCL",name:"Calicut",lat:11.1368,lon:75.9552,rwy:9003},
+  {icao:"VEBS",name:"Bhubaneswar",lat:20.2444,lon:85.8178,rwy:7218},
+  {icao:"DTTA",name:"Tunis Carthage",lat:36.8510,lon:10.2272,rwy:10105},
+  {icao:"DAAG",name:"Algiers",lat:36.6910,lon:3.2154,rwy:11811},
+  {icao:"GMMN",name:"Casablanca",lat:33.3675,lon:-7.5900,rwy:12139},
+  {icao:"GMAD",name:"Agadir",lat:30.3250,lon:-9.4131,rwy:9843},
+  {icao:"HECA",name:"Cairo Intl",lat:30.1219,lon:31.4056,rwy:13451},
+  {icao:"HELX",name:"Luxor",lat:25.6710,lon:32.7066,rwy:9843},
+  {icao:"HEAR",name:"Aswan",lat:23.9644,lon:32.8200,rwy:10499},
+  {icao:"HAAB",name:"Addis Ababa",lat:8.9779,lon:38.7993,rwy:12467},
+  {icao:"HKJK",name:"Nairobi Jomo Kenyatta",lat:-1.3192,lon:36.9275,rwy:14500},
+  {icao:"HTDA",name:"Dar es Salaam",lat:-6.8781,lon:39.2026,rwy:9843},
+  {icao:"FWLI",name:"Lilongwe",lat:-13.7894,lon:33.7810,rwy:10499},
+  {icao:"FALA",name:"Lanseria South Africa",lat:-25.9385,lon:27.9261,rwy:8202},
+  {icao:"FAOR",name:"Johannesburg OR Tambo",lat:-26.1392,lon:28.2460,rwy:15009},
+  {icao:"FACT",name:"Cape Town Intl",lat:-33.9649,lon:18.6017,rwy:10007},
+  {icao:"FADT",name:"Port Elizabeth",lat:-33.9849,lon:25.6173,rwy:7218},
+  {icao:"FBSK",name:"Gaborone",lat:-24.5552,lon:25.9182,rwy:9843},
+  {icao:"FVHA",name:"Harare Intl",lat:-17.9318,lon:31.0928,rwy:15500},
+  {icao:"FQMA",name:"Maputo",lat:-25.9208,lon:32.5726,rwy:11155},
+  {icao:"FYWH",name:"Windhoek",lat:-22.4799,lon:17.4709,rwy:14928},
+  {icao:"FCBB",name:"Brazzaville",lat:-4.2517,lon:15.2530,rwy:9843},
+  {icao:"DIAP",name:"Abidjan Cote d'Ivoire",lat:5.2613,lon:-3.9263,rwy:9843},
+  {icao:"DNAA",name:"Abuja",lat:9.0068,lon:7.2632,rwy:12008},
+  {icao:"DNMM",name:"Lagos",lat:6.5774,lon:3.3212,rwy:12001},
+  {icao:"DXXX",name:"Lome Togo",lat:6.1656,lon:1.2545,rwy:9843},
+  {icao:"GOOY",name:"Dakar",lat:14.7397,lon:-17.4902,rwy:11483},
+  {icao:"GABS",name:"Bamako",lat:12.5335,lon:-7.9499,rwy:11483},
+  {icao:"SBBR",name:"Brasilia",lat:-15.8711,lon:-47.9186,rwy:10827},
+  {icao:"SBGR",name:"Sao Paulo Guarulhos",lat:-23.4356,lon:-46.4731,rwy:13123},
+  {icao:"SBSP",name:"Sao Paulo Congonhas",lat:-23.6261,lon:-46.6564,rwy:6398},
+  {icao:"SBGL",name:"Rio Galeao",lat:-22.8099,lon:-43.2505,rwy:13123},
+  {icao:"SBBE",name:"Belem",lat:-1.3793,lon:-48.4763,rwy:9843},
+  {icao:"SBMN",name:"Manaus",lat:-3.0386,lon:-60.0497,rwy:9843},
+  {icao:"SBRF",name:"Recife",lat:-8.1265,lon:-34.9236,rwy:10170},
+  {icao:"SBSV",name:"Salvador Bahia",lat:-12.9086,lon:-38.3225,rwy:9875},
+  {icao:"SBCT",name:"Curitiba",lat:-25.5285,lon:-49.1758,rwy:9843},
+  {icao:"SBPA",name:"Porto Alegre",lat:-29.9944,lon:-51.1714,rwy:9350},
+  {icao:"SCEL",name:"Santiago",lat:-33.3930,lon:-70.7858,rwy:13123},
+  {icao:"SEQM",name:"Quito",lat:-0.1292,lon:-78.3575,rwy:13451},
+  {icao:"SKBO",name:"Bogota",lat:4.7016,lon:-74.1469,rwy:12467},
+  {icao:"SPIM",name:"Lima",lat:-12.0219,lon:-77.1143,rwy:11486},
+  {icao:"SUMU",name:"Montevideo",lat:-34.8384,lon:-56.0308,rwy:9843},
+  {icao:"SAEZ",name:"Buenos Aires Ezeiza",lat:-34.8222,lon:-58.5358,rwy:10827},
+  {icao:"SABE",name:"Buenos Aires Jorge Newbery",lat:-34.5592,lon:-58.4156,rwy:7218},
+  {icao:"SASJ",name:"Salta Argentina",lat:-24.8560,lon:-65.4861,rwy:9843},
+  {icao:"SLLP",name:"La Paz Bolivia",lat:-16.5133,lon:-68.1922,rwy:13287},
+  {icao:"SVMI",name:"Caracas",lat:10.6031,lon:-66.9906,rwy:11483},
+  {icao:"MMMX",name:"Mexico City",lat:19.4363,lon:-99.0721,rwy:12965},
+  {icao:"MMGL",name:"Guadalajara",lat:20.5218,lon:-103.3105,rwy:12139},
+  {icao:"MMCN",name:"Culiacan",lat:24.7645,lon:-107.4745,rwy:8858},
+  {icao:"MMTJ",name:"Tijuana",lat:32.5411,lon:-116.9701,rwy:9843},
+  {icao:"MMUN",name:"Cancun",lat:21.0365,lon:-86.8770,rwy:11483},
+  {icao:"MMBT",name:"Huatulco",lat:15.7753,lon:-96.2626,rwy:7218},
+  {icao:"MMPR",name:"Puerto Vallarta",lat:20.6801,lon:-105.2544,rwy:10499},
+  {icao:"MMSD",name:"Los Cabos",lat:23.1518,lon:-109.7216,rwy:9843},
+  {icao:"MRLB",name:"Liberia Costa Rica",lat:10.5933,lon:-85.5444,rwy:8957},
+  {icao:"MROC",name:"San Jose Costa Rica",lat:9.9939,lon:-84.2088,rwy:9882},
+  {icao:"MPTO",name:"Panama City Tocumen",lat:9.0714,lon:-79.3835,rwy:10005},
+  {icao:"MGGT",name:"Guatemala City",lat:14.5833,lon:-90.5275,rwy:9843},
+  {icao:"MHTG",name:"Tegucigalpa",lat:14.0608,lon:-87.2172,rwy:7218},
+  {icao:"MSSS",name:"San Salvador",lat:13.4409,lon:-89.0557,rwy:8530},
+  {icao:"MNMG",name:"Managua",lat:12.1415,lon:-86.1682,rwy:9843},
+  {icao:"MDPP",name:"Puerto Plata",lat:19.7579,lon:-70.5700,rwy:9843},
+  {icao:"MDSD",name:"Santo Domingo",lat:18.4297,lon:-69.6689,rwy:11484},
+  {icao:"MKJP",name:"Kingston Jamaica",lat:17.9357,lon:-76.7875,rwy:8900},
+  {icao:"MUBR",name:"Holguin Cuba",lat:20.7856,lon:-76.3151,rwy:8530},
+  {icao:"MUHA",name:"Havana",lat:22.9892,lon:-82.4091,rwy:13123},
+  {icao:"TNCM",name:"Sint Maarten",lat:18.0410,lon:-63.1089,rwy:7546},
+  {icao:"TISX",name:"St Croix USVI",lat:17.7019,lon:-64.7985,rwy:8000},
+  {icao:"TJSJ",name:"San Juan Puerto Rico",lat:18.4394,lon:-66.0018,rwy:10002},
+  {icao:"MBPV",name:"Providenciales",lat:21.7736,lon:-72.2659,rwy:8002},
+  {icao:"MYGF",name:"Grand Bahama",lat:26.5587,lon:-78.6956,rwy:11000},
+  {icao:"MYNN",name:"Nassau Bahamas",lat:25.0390,lon:-77.4662,rwy:11000},
+  {icao:"MYEG",name:"Exuma Bahamas",lat:23.5628,lon:-75.8779,rwy:7000},
+  {icao:"TNCA",name:"Aruba",lat:12.5014,lon:-70.0152,rwy:9000},
+  {icao:"TNCB",name:"Bonaire",lat:12.1310,lon:-68.2688,rwy:9000},
+  {icao:"TNCC",name:"Curacao",lat:12.1888,lon:-68.9598,rwy:11188},
+  {icao:"TTPP",name:"Trinidad",lat:10.5954,lon:-61.3372,rwy:9396},
+  {icao:"TBPB",name:"Barbados",lat:13.0746,lon:-59.4925,rwy:11000},
+  {icao:"TGPY",name:"Grenada",lat:12.0042,lon:-61.7862,rwy:9000},
+  {icao:"TVSV",name:"St Vincent",lat:13.1440,lon:-61.2100,rwy:6000},
+  {icao:"TFFR",name:"Pointe-a-Pitre Guadeloupe",lat:16.2653,lon:-61.5318,rwy:11483},
+  {icao:"TFFF",name:"Fort-de-France Martinique",lat:14.5910,lon:-60.9961,rwy:11483},
+  {icao:"TXKF",name:"Bermuda",lat:32.3640,lon:-64.6788,rwy:9713},
+  {icao:"NZAA",name:"Auckland",lat:-37.0082,lon:174.7917,rwy:11001},
+  {icao:"NZWN",name:"Wellington",lat:-41.3272,lon:174.8050,rwy:6351},
+  {icao:"NZCH",name:"Christchurch",lat:-43.4894,lon:172.5322,rwy:10787},
+  {icao:"NZQN",name:"Queenstown",lat:-45.0211,lon:168.7392,rwy:6890},
+  {icao:"NZDN",name:"Dunedin",lat:-45.9281,lon:170.1983,rwy:6070},
+  {icao:"YBBN",name:"Brisbane",lat:-27.3842,lon:153.1175,rwy:13123},
+  {icao:"YSSY",name:"Sydney Kingsford Smith",lat:-33.9399,lon:151.1753,rwy:13000},
+  {icao:"YMML",name:"Melbourne",lat:-37.6733,lon:144.8430,rwy:12000},
+  {icao:"YPAD",name:"Adelaide",lat:-34.9450,lon:138.5306,rwy:10000},
+  {icao:"YPPH",name:"Perth",lat:-31.9403,lon:115.9669,rwy:11483},
+  {icao:"YBCS",name:"Cairns",lat:-16.8858,lon:145.7552,rwy:9843},
+  {icao:"YBAS",name:"Alice Springs",lat:-23.8067,lon:133.9022,rwy:8500},
+  {icao:"YPDN",name:"Darwin",lat:-12.4147,lon:130.8766,rwy:11000},
+  {icao:"YBTL",name:"Townsville",lat:-19.2525,lon:146.7652,rwy:8600},
+  {icao:"YMHB",name:"Hobart",lat:-42.8361,lon:147.5103,rwy:7218},
+  {icao:"YCBR",name:"Canberra",lat:-35.3069,lon:149.1950,rwy:8800},
+  {icao:"NFNA",name:"Nadi Fiji",lat:-17.7554,lon:177.4430,rwy:10548},
+  {icao:"NVVV",name:"Vanuatu Port Vila",lat:-17.6993,lon:168.3200,rwy:8793},
+  {icao:"NSFA",name:"Apia Samoa",lat:-13.8300,lon:-172.0083,rwy:8858},
+  {icao:"NTAA",name:"Papeete Tahiti",lat:-17.5534,lon:-149.6069,rwy:11483},
+  {icao:"PGUM",name:"Guam",lat:13.4834,lon:144.7960,rwy:12000},
+  {icao:"BIKF",name:"Keflavik Iceland",lat:63.9850,lon:-22.6056,rwy:12484},
+  {icao:"BIAR",name:"Akureyri Iceland",lat:65.6600,lon:-18.0728,rwy:7218},
+  {icao:"BGBW",name:"Narsarsuaq Greenland",lat:61.1605,lon:-45.4260,rwy:7710},
+  {icao:"BGSF",name:"Sondre Stromfjord Greenland",lat:67.0122,lon:-50.6892,rwy:11270},
+  {icao:"CYYC",name:"Calgary",lat:51.1139,lon:-114.0200,rwy:14000},
+  {icao:"CYEG",name:"Edmonton Intl",lat:53.3097,lon:-113.5797,rwy:11000},
+  {icao:"CYVR",name:"Vancouver",lat:49.1947,lon:-123.1792,rwy:11000},
+  {icao:"CYWG",name:"Winnipeg",lat:49.9100,lon:-97.2399,rwy:11000},
+  {icao:"CYOW",name:"Ottawa",lat:45.3225,lon:-75.6692,rwy:10000},
+  {icao:"CYUL",name:"Montreal Trudeau",lat:45.4706,lon:-73.7408,rwy:11000},
+  {icao:"CYYZ",name:"Toronto Pearson",lat:43.6772,lon:-79.6306,rwy:11120},
+  {icao:"CYHZ",name:"Halifax",lat:44.8808,lon:-63.5086,rwy:8900},
+  {icao:"CYQB",name:"Quebec City",lat:46.7911,lon:-71.3933,rwy:9000},
+  {icao:"CYYJ",name:"Victoria BC",lat:48.6469,lon:-123.4258,rwy:7000},
+  {icao:"CYKA",name:"Kamloops",lat:50.7022,lon:-120.4444,rwy:7000},
+  {icao:"CYXS",name:"Prince George",lat:53.8894,lon:-122.6792,rwy:7500},
+  {icao:"CYXY",name:"Whitehorse",lat:60.7096,lon:-135.0674,rwy:9501},
+  {icao:"CYZF",name:"Yellowknife",lat:62.4628,lon:-114.4403,rwy:7500},
+  {icao:"CYEV",name:"Inuvik",lat:68.3042,lon:-133.4831,rwy:6000},
+  {icao:"UUEE",name:"Moscow Sheremetyevo",lat:55.9726,lon:37.4146,rwy:12139},
+  {icao:"UUDD",name:"Moscow Domodedovo",lat:55.4088,lon:37.9063,rwy:12467},
+  {icao:"ULLI",name:"St Petersburg",lat:59.8003,lon:30.2625,rwy:11549},
+  {icao:"USSS",name:"Yekaterinburg",lat:56.7431,lon:60.8027,rwy:11483},
+  {icao:"UNNT",name:"Novosibirsk",lat:54.9663,lon:82.6507,rwy:10827},
+  {icao:"UHHH",name:"Khabarovsk",lat:48.5280,lon:135.1883,rwy:11483},
+  {icao:"UHWW",name:"Vladivostok",lat:43.3990,lon:132.1478,rwy:10663},
+  {icao:"EPGD",name:"Gdansk",lat:54.3777,lon:18.4662,rwy:9843},
+  {icao:"EPRZ",name:"Rzeszow",lat:50.1100,lon:22.0189,rwy:8202},
+  {icao:"LHBP",name:"Budapest",lat:47.4330,lon:19.2611,rwy:13123},
+  {icao:"LROP",name:"Bucharest Otopeni",lat:44.5722,lon:26.1021,rwy:11483},
+  {icao:"LWSK",name:"Skopje",lat:41.9616,lon:21.6214,rwy:8202},
+  {icao:"LYBE",name:"Belgrade",lat:44.8184,lon:20.3091,rwy:11483},
+  {icao:"LDZA",name:"Zagreb",lat:45.7429,lon:16.0688,rwy:10827},
+  {icao:"LJLJ",name:"Ljubljana",lat:46.2237,lon:14.4576,rwy:9843},
+  {icao:"LSZH",name:"Zurich",lat:47.4647,lon:8.5492,rwy:10827},
+  {icao:"LSGG",name:"Geneva",lat:46.2380,lon:6.1089,rwy:12795},
+  {icao:"ENAL",name:"Alesund Norway",lat:62.5625,lon:6.1197,rwy:7677},
+  {icao:"ENBR",name:"Bergen Norway",lat:60.2934,lon:5.2181,rwy:9842},
+  {icao:"ENGM",name:"Oslo Gardermoen",lat:60.1939,lon:11.1004,rwy:11811},
+  {icao:"ENVA",name:"Trondheim",lat:63.4578,lon:10.9260,rwy:9449},
+  {icao:"ESGG",name:"Gothenburg",lat:57.6628,lon:12.2798,rwy:10827},
+  {icao:"ESSA",name:"Stockholm Arlanda",lat:59.6519,lon:17.9186,rwy:10826},
+  {icao:"ESMS",name:"Malmo",lat:55.5363,lon:13.3762,rwy:8858},
+  {icao:"EKCH",name:"Copenhagen",lat:55.6181,lon:12.6560,rwy:11007},
+  {icao:"EFHK",name:"Helsinki",lat:60.3172,lon:24.9633,rwy:10827},
+  {icao:"EVRA",name:"Riga",lat:56.9236,lon:23.9711,rwy:9843},
+  {icao:"EYVI",name:"Vilnius",lat:54.6341,lon:25.2858,rwy:9843},
+  {icao:"EETN",name:"Tallinn",lat:59.4133,lon:24.8328,rwy:9843}
+];
+
+const CRUISE_SPEED_KTS = 175;
+const BURN_RATE_LBS_HR = 300;
+let currentMargin = 5;
+let currentBaseFuel = 0;
+let leafMap = null;
+let routeLayer = null;
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 3440.065;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+function calcFuel(distNm) {
+  const flightHrs = distNm / CRUISE_SPEED_KTS;
+  const totalMins = Math.round(flightHrs * 60);
+  const hrs = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  return { baseFuel: Math.round(flightHrs * BURN_RATE_LBS_HR), timeStr: hrs + ':' + String(mins).padStart(2, '0') };
+}
+
+function setMargin(pct) {
+  currentMargin = pct;
+  document.querySelectorAll('.margin-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn' + pct).classList.add('active');
+  updateFuelTotal();
+}
+
+function updateFuelTotal() {
+  if (!currentBaseFuel) return;
+  document.getElementById('fuelTotal').textContent = Math.round(currentBaseFuel * (1 + currentMargin / 100)).toLocaleString();
+}
+
+function parseMETAR(raw) {
+  const result = { raw, temp: null, windDir: null, windSpd: null, windGust: null, vis: null, altimeter: null, sky: [], flightCat: 'VFR' };
+  const tMatch = raw.match(/\s(M?\d{2})\/(M?\d{2})\s/);
+  if (tMatch) result.temp = tMatch[1].startsWith('M') ? -parseInt(tMatch[1].slice(1)) : parseInt(tMatch[1]);
+  const wMatch = raw.match(/\s(VRB|\d{3})(\d{2,3})(G(\d{2,3}))?KT\s/);
+  if (wMatch) { result.windDir = wMatch[1] === 'VRB' ? 'VRB' : parseInt(wMatch[1]); result.windSpd = parseInt(wMatch[2]); result.windGust = wMatch[4] ? parseInt(wMatch[4]) : null; }
+  const vMatch = raw.match(/\s(\d+(?:\s\d+\/\d+)?|\d+\/\d+)SM\s/);
+  if (vMatch) result.vis = vMatch[1];
+  const aMatch = raw.match(/\sA(\d{4})\s?/);
+  if (aMatch) result.altimeter = (parseInt(aMatch[1]) / 100).toFixed(2);
+  const skyRe = /(FEW|SCT|BKN|OVC|SKC|CLR|CAVOK)(\d{3})?/g;
+  let sm;
+  while ((sm = skyRe.exec(raw)) !== null) result.sky.push({ cov: sm[1], alt: sm[2] ? parseInt(sm[2]) * 100 : null });
+  let ceiling = 99999;
+  for (const layer of result.sky) { if ((layer.cov === 'BKN' || layer.cov === 'OVC') && layer.alt !== null && layer.alt < ceiling) ceiling = layer.alt; }
+  const visNum = result.vis ? parseFloat(result.vis) : 99;
+  if (ceiling < 500 || visNum < 1) result.flightCat = 'LIFR';
+  else if (ceiling < 1000 || visNum < 3) result.flightCat = 'IFR';
+  else if (ceiling < 3000 || visNum < 5) result.flightCat = 'MVFR';
+  return result;
+}
+
+function skyDescription(sky) {
+  const labels = { FEW:'Few clouds', SCT:'Scattered', BKN:'Broken ceiling', OVC:'Overcast', SKC:'Sky clear', CLR:'Clear', CAVOK:'CAVOK' };
+  if (!sky || !sky.length) return '';
+  if (sky[0].cov === 'SKC' || sky[0].cov === 'CLR' || sky[0].cov === 'CAVOK') return 'Sky clear';
+  return sky.map(s => (labels[s.cov] || s.cov) + (s.alt ? ' at ' + s.alt.toLocaleString() + ' ft' : '')).join(' &bull; ');
+}
+
+async function fetchWeather(icao) {
+  document.getElementById('wxLoading').style.display = 'block';
+  document.getElementById('wxContent').style.display = 'none';
+  document.getElementById('wxError').style.display = 'none';
+  document.getElementById('wxFlightCat').textContent = '';
+  try {
+    const url = 'https://thingproxy.freeboard.io/fetch/https://aviationweather.gov/api/data/metar?ids=' + icao + '&format=raw&hours=2';
+const resp = await fetch(url);
+    const text = await resp.text();
+    const lines = text.trim().split('\n').filter(l => l.trim().length > 0);
+    if (!lines.length || lines[0].toLowerCase().includes('no data')) throw new Error('No METAR available for ' + icao);
+    const wx = parseMETAR(lines[0].trim());
+    const tempC = wx.temp !== null ? wx.temp : null;
+    const tempF = tempC !== null ? Math.round(tempC * 9/5 + 32) : null;
+    document.getElementById('wxTemp').textContent = tempC !== null ? tempC + ' / ' + tempF : '—';
+    document.getElementById('wxTempUnit').textContent = tempC !== null ? '°C  /  °F' : '';
+    if (wx.windSpd !== null) {
+      document.getElementById('wxWindSpd').textContent = wx.windSpd + (wx.windGust ? ' G' + wx.windGust : '') + ' kts';
+      document.getElementById('wxWindDir').textContent = 'From ' + (wx.windDir === 'VRB' ? 'variable' : wx.windDir + '°');
+    } else { document.getElementById('wxWindSpd').textContent = 'Calm'; document.getElementById('wxWindDir').textContent = ''; }
+    document.getElementById('wxVis').textContent = wx.vis || '—';
+    document.getElementById('wxAlt').textContent = wx.altimeter || '—';
+    document.getElementById('wxSky').innerHTML = skyDescription(wx.sky) ? '<strong>Sky:</strong> ' + skyDescription(wx.sky) : '';
+    document.getElementById('wxRaw').textContent = 'METAR: ' + wx.raw;
+    const catEl = document.getElementById('wxFlightCat');
+    catEl.textContent = wx.flightCat;
+    catEl.className = 'wx-vfr ' + wx.flightCat.toLowerCase();
+    document.getElementById('wxStation').textContent = 'METAR ' + icao;
+    document.getElementById('wxLoading').style.display = 'none';
+    document.getElementById('wxContent').style.display = 'block';
+  } catch (err) {
+    document.getElementById('wxLoading').style.display = 'none';
+    document.getElementById('wxError').style.display = 'block';
+    document.getElementById('wxError').textContent = 'Weather unavailable: ' + err.message;
+  }
+}
+
+function initMap() {
+  if (leafMap) return;
+  leafMap = L.map('map', {zoomControl: true}).setView([30, 0], 2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© CARTO, © OpenStreetMap', maxZoom: 19 }).addTo(leafMap);
+}
+function generateFlight() {
+  const minD = parseInt(document.getElementById('minDist').value);
+  const maxD = parseInt(document.getElementById('maxDist').value);
+  const warn = document.getElementById('warnMsg');
+  if (minD >= maxD) { warn.style.display = 'block'; warn.textContent = 'Min distance must be less than max distance.'; return; }
+  warn.style.display = 'none';
+  const eligible = AIRPORTS.filter(a => a.rwy >= 2000);
+  let dep, arr, dist, tries = 0;
+  do {
+    dep = eligible[Math.floor(Math.random() * eligible.length)];
+    arr = eligible[Math.floor(Math.random() * eligible.length)];
+    if (dep.icao !== arr.icao) dist = haversine(dep.lat, dep.lon, arr.lat, arr.lon);
+    tries++;
+  } while ((dep.icao === arr.icao || dist < minD || dist > maxD) && tries < 500);
+  if (tries >= 500) { warn.style.display = 'block'; warn.textContent = 'Could not find a matching route. Try widening your distance range.'; return; }
+  document.getElementById('depCode').textContent = dep.icao;
+  document.getElementById('depName').textContent = dep.name;
+  document.getElementById('depRwy').textContent = dep.rwy.toLocaleString() + ' ft';
+  document.getElementById('arrCode').textContent = arr.icao;
+  document.getElementById('arrName').textContent = arr.name;
+  document.getElementById('arrRwy').textContent = arr.rwy.toLocaleString() + ' ft';
+  document.getElementById('distNum').textContent = dist + ' nm';
+  const fuel = calcFuel(dist);
+  currentBaseFuel = fuel.baseFuel;
+  document.getElementById('fuelTime').textContent = fuel.timeStr;
+  document.getElementById('fuelBase').textContent = fuel.baseFuel.toLocaleString();
+  updateFuelTotal();
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('empty').style.display = 'none';
+  fetchWeather(dep.icao);
+  setTimeout(() => {
+    initMap();
+    if (routeLayer) leafMap.removeLayer(routeLayer);
+    const depMark = L.marker([dep.lat, dep.lon]).bindPopup('<b>' + dep.icao + '</b><br>' + dep.name + '<br>Runway: ' + dep.rwy.toLocaleString() + ' ft');
+    const arrMark = L.marker([arr.lat, arr.lon]).bindPopup('<b>' + arr.icao + '</b><br>' + arr.name + '<br>Runway: ' + arr.rwy.toLocaleString() + ' ft');
+    const line = L.polyline([[dep.lat, dep.lon],[arr.lat, arr.lon]], { color: '#2980b9', weight: 2, dashArray: '6 4' });
+    routeLayer = L.layerGroup([depMark, arrMark, line]).addTo(leafMap);
+    leafMap.fitBounds([[dep.lat, dep.lon],[arr.lat, arr.lon]], {padding: [40, 40]});
+    leafMap.invalidateSize();
+  }, 100);
+}
+</script>
+
+</body>
+</html>
